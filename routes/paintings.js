@@ -1,7 +1,7 @@
 // routes/paintings.js
 const express = require("express");
 const router = express.Router();
-const paintingController = require("../controller/paintingController");
+const paintingController = require("../controllers/paintingController");
 
 router
   .route("/")
