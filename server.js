@@ -34,6 +34,9 @@ app.get("/", (req, res) => {
   res.send("Server is working");
 });
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use("/uploads", express.static("uploads"));
 app.use("/paintings", require("./routes/paintings"));
 app.use("/devices", require("./routes/devices"));
 

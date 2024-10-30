@@ -9,7 +9,7 @@ const paintingSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  pid: {
+  title: {
     type: String,
     required: true,
   },
@@ -18,15 +18,15 @@ const paintingSchema = new mongoose.Schema({
     required: true,
     min: 0,
   },
-  year: {
-    type: Number,
-    required: true,
-  },
-  description: {
+  city: {
     type: String,
     required: true,
   },
-  image: {
+  country: {
+    type: String,
+    required: true,
+  },
+  school: {
     type: String,
     required: true,
   },
@@ -34,9 +34,40 @@ const paintingSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  country: {
+  contest: {
     type: String,
     required: true,
+  },
+  year: {
+    type: Number,
+    required: true,
+  },
+  award: {
+    type: String,
+    required: false,
+    default: null,
+  },
+  image: {
+    type: String,
+    required: true,
+  },
+  filters: {
+    technique: {
+      type: String,
+      required: true,
+    },
+    contest: {
+      type: String,
+      required: true,
+    },
+    award: {
+      type: Boolean,
+      required: true,
+    },
+    country: {
+      type: String,
+      required: true,
+    },
   },
 });
 
