@@ -7,7 +7,7 @@ const fs = require("fs");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    cb(null, "public/uploads");
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
@@ -17,6 +17,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // CREATE PAINTING z konwersją na WebM
+
 const createPainting = async (req, res) => {
   const {
     firstName,
@@ -34,43 +35,54 @@ const createPainting = async (req, res) => {
     filters,
   } = req.body;
 
-  // Ensure the 'uploads' directory exists
-  const uploadsDir = path.join(process.cwd(), "uploads");
+  const uploadsDir = path.join(process.cwd(), "/public/uploads");
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
 
-  let imagePath;
+  let tempImagePath;
   if (image.startsWith("data:image")) {
-    // Decode base64 string
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-    imagePath = path.join(uploadsDir, `${Date.now()}.png`);
-    fs.writeFileSync(imagePath, buffer);
+    tempImagePath = path.join(uploadsDir, `${Date.now()}.png`);
+    fs.writeFileSync(tempImagePath, buffer);
   } else {
     return res.status(400).json({ message: "Invalid image format" });
   }
 
-  try {
-    const painting = await Painting.create({
-      firstName,
-      lastName,
-      title,
-      age,
-      city,
-      country,
-      school,
-      technique,
-      contest,
-      year,
-      award,
-      image: imagePath,
-      filters,
-    });
-    res.status(201).json(painting);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+  // Konwersja pliku do formatu .webm
+  const webmPath = path.join(uploadsDir, `${Date.now()}.webm`);
+  ffmpeg(tempImagePath)
+    .output(webmPath)
+    .on("end", async () => {
+      fs.unlinkSync(tempImagePath); // Usuń plik tymczasowy
+
+      try {
+        const painting = await Painting.create({
+          firstName,
+          lastName,
+          title,
+          age,
+          city,
+          country,
+          school,
+          technique,
+          contest,
+          year,
+          award,
+          image: path.basename(webmPath),
+          filters,
+        });
+
+        res.status(201).json(painting);
+      } catch (err) {
+        res.status(500).json({ message: err.message });
+      }
+    })
+    .on("error", err => {
+      res.status(500).json({ message: "Conversion error: " + err.message });
+    })
+    .run();
 };
 
 // GET ALL PAINTINGS METHOD
