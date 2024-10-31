@@ -1,28 +1,66 @@
 const express = require("express");
 const ws = require("ws");
+const url = require("url");
+const { format } = require("path");
 
 const connectedDevices = [];
 
 const getAllDevices = (req, res) => {
-  res.json(connectedDevices.map((device) => device.deviceId));
+  // res.json(connectedDevices.map((device) => device.deviceId));
+  console.log(connectedDevices);
+  res.json(
+    connectedDevices.map((device) => ({
+      deviceId: device.deviceId,
+      name: device.name,
+      row: device.row,
+      col: device.col,
+      format: device.format,
+      imagePath: device.imagePath,
+    }))
+  );
 };
 
+// const sendMessage = (req, res) => {
+//   const { deviceList, message } = req.body;
+//   console.log("Sending message to", deviceId);
+
+//   deviceList.map((el) => {
+//     const device = connectedDevices.find(
+//       (device) => device.deviceId === deviceId
+//     );
+
+//     if (device) {
+//       device.ws.send(JSON.stringify({ type: "message", content: message }));
+//       console.log(`Message sent to device ${deviceId}`);
+//       res.json({ status: "Message sent" });
+//     } else {
+//       console.log(`Device ${deviceId} not found`);
+//       res.status(404).json({ error: "Device not found" });
+//     }
+//   });
+// };
+
 const sendMessage = (req, res) => {
-  const { deviceId, message } = req.body;
-  console.log("Sending message to", deviceId);
+  const { deviceList, message } = req.body;
+  console.log("Sending message to devices:", deviceList);
 
-  const device = connectedDevices.find(
-    (device) => device.deviceId === deviceId
-  );
+  const results = deviceList.map((deviceId) => {
+    const device = connectedDevices.find(
+      (device) => device.deviceId === deviceId
+    );
 
-  if (device) {
-    device.ws.send(JSON.stringify({ type: "message", content: message }));
-    console.log(`Message sent to device ${deviceId}`);
-    res.json({ status: "Message sent" });
-  } else {
-    console.log(`Device ${deviceId} not found`);
-    res.status(404).json({ error: "Device not found" });
-  }
+    if (device) {
+      device.imagePath = message;
+      device.ws.send(JSON.stringify({ type: "message", content: message }));
+      console.log(`Message sent to device ${deviceId}`);
+      return { deviceId, status: "Message sent" };
+    } else {
+      console.log(`Device ${deviceId} not found`);
+      return { deviceId, error: "Device not found" };
+    }
+  });
+
+  res.json(results);
 };
 
 const startWebSocketServer = (server) => {
@@ -35,12 +73,13 @@ const startWebSocketServer = (server) => {
       const parsedData = JSON.parse(data);
       console.log("Received deviceId:", parsedData.deviceId);
 
-      // Sprawdź, czy urządzenie jest już dodane
       const existingDevice = connectedDevices.find(
         (device) => device.deviceId === parsedData.deviceId
       );
       if (!existingDevice) {
-        connectedDevices.push({ deviceId: parsedData.deviceId, ws });
+        // connectedDevices.push({ deviceId: parsedData.deviceId, ws });
+        console.log(parsedData);
+        connectedDevices.push({ ...parsedData, ws });
         console.log(`Device ${parsedData.deviceId} added`);
       } else {
         console.log(`Device ${parsedData.deviceId} is already connected`);
@@ -52,7 +91,6 @@ const startWebSocketServer = (server) => {
     ws.on("close", () => {
       console.log("Client disconnected");
 
-      // Usuwamy urządzenie z connectedDevices po zamknięciu połączenia
       const index = connectedDevices.findIndex((device) => device.ws === ws);
       if (index !== -1) {
         console.log(`Device ${connectedDevices[index].deviceId} removed`);
