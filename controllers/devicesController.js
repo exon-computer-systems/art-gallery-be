@@ -9,7 +9,7 @@ const getAllDevices = (req, res) => {
   // res.json(connectedDevices.map((device) => device.deviceId));
   console.log(connectedDevices);
   res.json(
-    connectedDevices.map((device) => ({
+    connectedDevices.map(device => ({
       deviceId: device.deviceId,
       name: device.name,
       row: device.row,
@@ -44,9 +44,9 @@ const sendMessage = (req, res) => {
   const { deviceList, message } = req.body;
   console.log("Sending message to devices:", deviceList);
 
-  const results = deviceList.map((deviceId) => {
+  const results = deviceList.map(deviceId => {
     const device = connectedDevices.find(
-      (device) => device.deviceId === deviceId
+      device => device.deviceId === deviceId
     );
 
     if (device) {
@@ -63,18 +63,18 @@ const sendMessage = (req, res) => {
   res.json(results);
 };
 
-const startWebSocketServer = (server) => {
+const startWebSocketServer = server => {
   const wss = new ws.Server({ server });
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", ws => {
     console.log("Connection open");
 
-    ws.on("message", (data) => {
+    ws.on("message", data => {
       const parsedData = JSON.parse(data);
       console.log("Received deviceId:", parsedData.deviceId);
 
       const existingDevice = connectedDevices.find(
-        (device) => device.deviceId === parsedData.deviceId
+        device => device.deviceId === parsedData.deviceId
       );
       if (!existingDevice) {
         // connectedDevices.push({ deviceId: parsedData.deviceId, ws });
@@ -91,14 +91,14 @@ const startWebSocketServer = (server) => {
     ws.on("close", () => {
       console.log("Client disconnected");
 
-      const index = connectedDevices.findIndex((device) => device.ws === ws);
+      const index = connectedDevices.findIndex(device => device.ws === ws);
       if (index !== -1) {
         console.log(`Device ${connectedDevices[index].deviceId} removed`);
         connectedDevices.splice(index, 1);
       }
     });
 
-    ws.onerror = (error) => {
+    ws.onerror = error => {
       console.log("WebSocket error:", error);
     };
   });

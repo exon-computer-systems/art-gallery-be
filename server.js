@@ -37,7 +37,7 @@ app.get("/", (req, res) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
-app.use("/paintings", require("./routes/paintings"));
+app.use("/api/v1/paintings", require("./routes/paintings"));
 app.use("/devices", require("./routes/devices"));
 
 mongoose.connection.once("open", () => {

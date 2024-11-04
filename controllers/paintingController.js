@@ -50,10 +50,10 @@ const createPainting = async (req, res) => {
     return res.status(400).json({ message: "Invalid image format" });
   }
 
-  // Konwersja pliku do formatu .webm
-  const webmPath = path.join(uploadsDir, `${Date.now()}.webm`);
+  // Konwersja pliku do formatu .webp
+  const webpPath = path.join(uploadsDir, `${Date.now()}.webp`);
   ffmpeg(tempImagePath)
-    .output(webmPath)
+    .output(webpPath)
     .on("end", async () => {
       fs.unlinkSync(tempImagePath); // Usuń plik tymczasowy
 
@@ -70,7 +70,7 @@ const createPainting = async (req, res) => {
           contest,
           year,
           award,
-          image: path.basename(webmPath),
+          image: path.basename(webpPath),
           filters,
         });
 
