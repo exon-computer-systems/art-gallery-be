@@ -1,104 +1,159 @@
 const express = require("express");
 const ws = require("ws");
-const url = require("url");
-const { format } = require("path");
+const Device = require("../model/Device");
 
 const connectedDevices = [];
 
-const getAllDevices = (req, res) => {
-  // res.json(connectedDevices.map((device) => device.deviceId));
-  console.log(connectedDevices);
-  res.json(
-    connectedDevices.map(device => ({
-      deviceId: device.deviceId,
-      name: device.name,
-      row: device.row,
-      col: device.col,
-      format: device.format,
-      imagePath: device.imagePath,
-    }))
-  );
+// Initialize devices with WebSocket connections if marked as connected in MongoDB
+const initializeConnectedDevices = async () => {
+  try {
+    const devices = await Device.find();
+    devices.forEach((device) => {
+      connectedDevices.push({
+        deviceId: device.deviceId,
+        name: device.name,
+        row: device.row,
+        col: device.col,
+        format: device.format,
+        imagePath: device.imagePath,
+        ws: null, // WebSocket will be assigned on connection
+        connected: device.connected || false, // Store connection status
+      });
+    });
+    console.log("Connected devices initialized from MongoDB.");
+  } catch (error) {
+    console.error("Error initializing connected devices:", error);
+  }
 };
 
-// const sendMessage = (req, res) => {
-//   const { deviceList, message } = req.body;
-//   console.log("Sending message to", deviceId);
+// Call initializeConnectedDevices when the server starts
+initializeConnectedDevices();
 
-//   deviceList.map((el) => {
-//     const device = connectedDevices.find(
-//       (device) => device.deviceId === deviceId
-//     );
+const getAllDevices = async (req, res) => {
+  try {
+    const devices = await Device.find();
+    res.json(devices);
+  } catch (error) {
+    console.error("Error fetching devices:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
-//     if (device) {
-//       device.ws.send(JSON.stringify({ type: "message", content: message }));
-//       console.log(`Message sent to device ${deviceId}`);
-//       res.json({ status: "Message sent" });
-//     } else {
-//       console.log(`Device ${deviceId} not found`);
-//       res.status(404).json({ error: "Device not found" });
-//     }
-//   });
-// };
-
-const sendMessage = (req, res) => {
+const sendMessage = async (req, res) => {
   const { deviceList, message } = req.body;
-  console.log("Sending message to devices:", deviceList);
 
-  const results = deviceList.map(deviceId => {
-    const device = connectedDevices.find(
-      device => device.deviceId === deviceId
-    );
+  if (connectedDevices.length === 0) {
+    await initializeConnectedDevices();
+  }
 
-    if (device) {
-      device.imagePath = message;
-      device.ws.send(JSON.stringify({ type: "message", content: message }));
-      console.log(`Message sent to device ${deviceId}`);
-      return { deviceId, status: "Message sent" };
-    } else {
-      console.log(`Device ${deviceId} not found`);
-      return { deviceId, error: "Device not found" };
-    }
-  });
+  const results = await Promise.all(
+    deviceList.map(async (deviceId) => {
+      let device = connectedDevices.find((d) => d.deviceId === deviceId);
+
+      if (!device) {
+        device = await Device.findOne({ deviceId });
+        if (device) {
+          connectedDevices.push({
+            ...device.toObject(),
+            ws: null,
+          });
+        }
+      }
+
+      if (device) {
+        device.imagePath = message;
+
+        if (device.ws) {
+          device.ws.send(JSON.stringify({ type: "message", content: message }));
+          console.log(`Message sent to device ${deviceId}`);
+        } else {
+          console.log(
+            `Device ${deviceId} is not currently connected via WebSocket`
+          );
+        }
+
+        await Device.updateOne({ deviceId }, { imagePath: message });
+
+        return { deviceId, status: "Message sent" };
+      } else {
+        console.log(`Device ${deviceId} not found in MongoDB`);
+        return { deviceId, error: "Device not found" };
+      }
+    })
+  );
 
   res.json(results);
 };
 
-const startWebSocketServer = server => {
+const startWebSocketServer = (server) => {
   const wss = new ws.Server({ server });
 
-  wss.on("connection", ws => {
+  wss.on("connection", (ws) => {
     console.log("Connection open");
 
-    ws.on("message", data => {
+    ws.on("message", async (data) => {
       const parsedData = JSON.parse(data);
       console.log("Received deviceId:", parsedData.deviceId);
 
-      const existingDevice = connectedDevices.find(
-        device => device.deviceId === parsedData.deviceId
+      let device = connectedDevices.find(
+        (d) => d.deviceId === parsedData.deviceId
       );
-      if (!existingDevice) {
-        // connectedDevices.push({ deviceId: parsedData.deviceId, ws });
-        console.log(parsedData);
-        connectedDevices.push({ ...parsedData, ws });
-        console.log(`Device ${parsedData.deviceId} added`);
+
+      if (!device) {
+        device = await Device.findOne({ deviceId: parsedData.deviceId });
+
+        if (!device) {
+          try {
+            device = new Device({
+              deviceId: parsedData.deviceId,
+              name: parsedData.name || "Unnamed Device",
+              row: parsedData.row || 1,
+              col: parsedData.col || 1,
+              format: parsedData.format || "vertical",
+              imagePath: parsedData.imagePath || "",
+              connected: true,
+            });
+            await device.save();
+            console.log(`New device ${parsedData.deviceId} added to MongoDB.`);
+          } catch (error) {
+            console.error("Error saving new device to MongoDB:", error);
+          }
+        }
+
+        connectedDevices.push({ ...device.toObject(), ws });
+        console.log(`Device ${device.deviceId} added and connected.`);
       } else {
-        console.log(`Device ${parsedData.deviceId} is already connected`);
+        device.ws = ws;
+        device.connected = true;
+        await Device.updateOne(
+          { deviceId: parsedData.deviceId },
+          { connected: true }
+        );
+        console.log(`Device ${parsedData.deviceId} is already connected.`);
       }
 
       console.log("Total connected devices:", connectedDevices.length);
     });
 
-    ws.on("close", () => {
+    ws.on("close", async () => {
       console.log("Client disconnected");
 
-      const index = connectedDevices.findIndex(device => device.ws === ws);
+      const index = connectedDevices.findIndex((device) => device.ws === ws);
       if (index !== -1) {
-        console.log(`Device ${connectedDevices[index].deviceId} removed`);
+        const device = connectedDevices[index];
+        device.connected = false;
+        await Device.updateOne(
+          { deviceId: device.deviceId },
+          { connected: false }
+        );
+        console.log(
+          `Device ${device.deviceId} disconnected and status updated.`
+        );
         connectedDevices.splice(index, 1);
       }
     });
 
-    ws.onerror = error => {
+    ws.onerror = (error) => {
       console.log("WebSocket error:", error);
     };
   });
