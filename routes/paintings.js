@@ -16,4 +16,6 @@ router
   .put(paintingController.updatePainting)
   .delete(paintingController.deletePainting);
 
+router.route("/filter").post(paintingController.getFilteredPainting);
+
 module.exports = router;

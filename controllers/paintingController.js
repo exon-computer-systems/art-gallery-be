@@ -79,7 +79,7 @@ const createPainting = async (req, res) => {
         res.status(500).json({ message: err.message });
       }
     })
-    .on("error", err => {
+    .on("error", (err) => {
       res.status(500).json({ message: "Conversion error: " + err.message });
     })
     .run();
@@ -148,10 +148,81 @@ const deletePainting = async (req, res) => {
   }
 };
 
+// GET FILTERED PAINTINGS
+const getFilteredPainting = async (req, res) => {
+  const {
+    firstName,
+    lastName,
+    title,
+    minAge,
+    maxAge,
+    city,
+    school,
+    minYear,
+    maxYear,
+    technique,
+    contest,
+    award,
+    country,
+  } = req.body;
+
+  const filter = {
+    ...(firstName && { firstName }),
+    ...(lastName && { lastName }),
+    ...(title && { title }),
+    // min max age
+    ...(minAge &&
+      maxAge && { age: { $gte: Number(minAge), $lte: Number(maxAge) } }),
+    // city school
+    ...(city && { city }),
+    ...(school && { school }),
+    // min max year
+    ...(minYear &&
+      maxYear && { year: { $gte: Number(minYear), $lte: Number(maxYear) } }),
+    // filters
+    ...(technique && { "filters.technique": technique }),
+    ...(contest && { "filters.contest": contest }),
+    ...(award && { "filters.award": award }),
+    ...(country && { "filters.country": country }),
+  };
+
+  try {
+    const paintings = await Painting.find(filter);
+    res.json(paintings);
+  } catch (err) {
+    console.log(err);
+    res.json(err);
+  }
+};
+
 module.exports = {
   getAllPaintings,
   getPainting,
   createPainting,
   updatePainting,
   deletePainting,
+  getFilteredPainting,
 };
+
+// {
+//   "filters": {
+//       "technique": "grafika komputerowa",
+//       "contest": "Ogólnopolski Konkurs Grafiki",
+//       "award": true,
+//       "country": "Polska"
+//   },
+//   "_id": "6728ce92e018bd639c3db10f",
+//   "firstName": "Michał",
+//   "lastName": "Nowak",
+//   "title": "Młody Grafik",
+//   "age": 12,
+//   "city": "Kraków",
+//   "country": "Polska",
+//   "school": "Szkoła Podstawowa nr 20",
+//   "technique": "grafika komputerowa",
+//   "contest": "Ogólnopolski Konkurs Grafiki",
+//   "year": 2022,
+//   "award": "Pierwsze miejsce",
+//   "image": "1730727569847.webp",
+//   "__v": 0
+// },
