@@ -1,19 +1,19 @@
-// routes/paintings.js
 const express = require("express");
 const router = express.Router();
-const paintingController = require("../controllers/paintingController");
+const {
+  createPainting,
+  getAllPaintings,
+  getPainting,
+  updatePainting,
+  deletePainting,
+  upload,
+} = require("./../controllers/paintingController");
 
-router
-  .route("/")
-  .get(paintingController.getAllPaintings)
-  .post(paintingController.createPainting);
-
-// router.route("/one/:id").get(paintingController.getPaintingById);
-
-router
-  .route("/:pid")
-  .get(paintingController.getPainting)
-  .put(paintingController.updatePainting)
-  .delete(paintingController.deletePainting);
+// Route to create a new painting
+router.post("/", upload.single("image"), createPainting);
+router.get("/", getAllPaintings);
+router.get("/:pid", getPainting);
+router.put("/:pid", updatePainting);
+router.delete("/:pid", deletePainting);
 
 module.exports = router;
