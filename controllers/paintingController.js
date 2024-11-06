@@ -251,7 +251,6 @@ const deletePainting = async (req, res) => {
   }
 };
 
-// GET FILTERED PAINTINGS
 const getFilteredPainting = async (req, res) => {
   const {
     firstName,
@@ -304,27 +303,6 @@ module.exports = {
   createPainting,
   updatePainting,
   deletePainting,
+  getFilteredPainting,
+  upload,
 };
-
-// {
-//   "filters": {
-//       "technique": "grafika komputerowa",
-//       "contest": "Ogólnopolski Konkurs Grafiki",
-//       "award": true,
-//       "country": "Polska"
-//   },
-//   "_id": "6728ce92e018bd639c3db10f",
-//   "firstName": "Michał",
-//   "lastName": "Nowak",
-//   "title": "Młody Grafik",
-//   "age": 12,
-//   "city": "Kraków",
-//   "country": "Polska",
-//   "school": "Szkoła Podstawowa nr 20",
-//   "technique": "grafika komputerowa",
-//   "contest": "Ogólnopolski Konkurs Grafiki",
-//   "year": 2022,
-//   "award": "Pierwsze miejsce",
-//   "image": "1730727569847.webp",
-//   "__v": 0
-// },

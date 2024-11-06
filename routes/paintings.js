@@ -6,6 +6,7 @@ const {
   getPainting,
   updatePainting,
   deletePainting,
+  getFilteredPainting,
   upload,
 } = require("./../controllers/paintingController");
 
@@ -16,6 +17,6 @@ router.get("/:pid", getPainting);
 router.put("/:pid", updatePainting);
 router.delete("/:pid", deletePainting);
 
-router.route("/filter").post(paintingController.getFilteredPainting);
+router.route("/filter").post(getFilteredPainting);
 
 module.exports = router;
