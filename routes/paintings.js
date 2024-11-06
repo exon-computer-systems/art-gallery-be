@@ -16,4 +16,6 @@ router.get("/:pid", getPainting);
 router.put("/:pid", updatePainting);
 router.delete("/:pid", deletePainting);
 
+router.route("/filter").post(paintingController.getFilteredPainting);
+
 module.exports = router;

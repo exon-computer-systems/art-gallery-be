@@ -31,15 +31,19 @@ startWebSocketServer(server);
 // access to public assets
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+app.use(express.json());
+
+app.use(express.urlencoded({ extended: true }));
+
+app.use("/uploads", express.static("uploads"));
+
 // routes
 app.get("/", (req, res) => {
   res.send("Server is working");
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static("uploads"));
 app.use("/api/v1/paintings", require("./routes/paintings"));
+
 app.use("/api/v1/devices", require("./routes/devices"));
 
 mongoose.connection.once("open", () => {
