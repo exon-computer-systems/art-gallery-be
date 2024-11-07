@@ -4,88 +4,203 @@ const multer = require("multer");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs");
+const { imageToWebp } = require("image-to-webp");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "public/uploads");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
+// CREATE PAINTING z konwersją na WebP
 
-const upload = multer({ storage: storage });
+const { Buffer } = require("buffer");
 
-// CREATE PAINTING z konwersją na WebM
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// Globalny obiekt do przechowywania fragmentów plików (w produkcji zaleca się użycie Redis lub bazy danych)
+const fileChunks = {};
 
 const createPainting = async (req, res) => {
-  const {
-    firstName,
-    lastName,
-    title,
-    age,
-    city,
-    country,
-    school,
-    technique,
-    contest,
-    year,
-    award,
-    image,
-    filters,
-  } = req.body;
+  try {
+    // Wyciągnięcie danych z `req.body`
+    const {
+      firstName,
+      lastName,
+      title,
+      age,
+      city,
+      country,
+      school,
+      technique,
+      contest,
+      year,
+      award,
+      filters,
+      chunkNumber,
+      totalChunks,
+      originalName,
+    } = req.body;
 
-  const uploadsDir = path.join(process.cwd(), "/public/uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+    // Przechowywanie fragmentu obrazu z multer
+    const fileChunk = req.file.buffer;
+
+    // Inicjalizacja tablicy do przechowywania fragmentów, jeśli jeszcze nie istnieje dla danego obrazu
+    if (!fileChunks[originalName]) {
+      fileChunks[originalName] = [];
+    }
+
+    // Dodanie fragmentu do tablicy
+    fileChunks[originalName][chunkNumber] = fileChunk;
+
+    // Sprawdzenie, czy wszystkie fragmenty zostały odebrane
+    if (parseInt(chunkNumber) === totalChunks - 1) {
+      // Złożenie pełnego obrazu z fragmentów
+      const fullImageBuffer = Buffer.concat(fileChunks[originalName]);
+
+      // Ścieżka do zapisu scalonego pliku
+      const filePath = path.join(
+        __dirname,
+        "./../public/uploads",
+        originalName
+      );
+
+      // Zapis scalonego pliku na dysk
+      fs.writeFileSync(filePath, fullImageBuffer);
+
+      // console.log("fullImageBuffer: ", filePath);
+
+      // const readFile = fs.readFileSync(`./public/uploads/${originalName}`);
+
+      // const imgToWebP = fullImageBuffer;
+      // const outputFilePath = await imageToWebp(fullImageBuffer, 90);
+      // fs.copyFileSync(
+      //   webpImage,
+      //   `${__dirname}/./../public/uplaods/${originalName.slice(0, -4)}.webp`
+      // );
+
+      // Usunięcie danych fragmentów po złożeniu pełnego obrazu
+      delete fileChunks[originalName];
+
+      // Tworzenie nowego dokumentu obrazu z nazwą pliku zamiast jego zawartości
+      const painting = new Painting({
+        firstName,
+        lastName,
+        title,
+        age,
+        city,
+        country,
+        school,
+        technique,
+        contest,
+        year,
+        award,
+        image: originalName, // zapisujemy tylko nazwę pliku
+        filters: JSON.parse(filters),
+      });
+
+      // Zapis dokumentu w bazie danych
+      await painting.save();
+
+      res
+        .status(201)
+        .json({ message: "Painting created successfully", painting });
+    } else {
+      // Odpowiedź o poprawnym przesłaniu fragmentu
+      res.status(200).json({
+        message: `Chunk ${parseInt(chunkNumber) + 1}/${totalChunks} received`,
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Failed to create painting", error: error.message });
   }
-
-  let tempImagePath;
-  if (image.startsWith("data:image")) {
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    tempImagePath = path.join(uploadsDir, `${Date.now()}.png`);
-    fs.writeFileSync(tempImagePath, buffer);
-  } else {
-    return res.status(400).json({ message: "Invalid image format" });
-  }
-
-  // Konwersja pliku do formatu .webp
-  const webpPath = path.join(uploadsDir, `${Date.now()}.webp`);
-  ffmpeg(tempImagePath)
-    .output(webpPath)
-    .on("end", async () => {
-      fs.unlinkSync(tempImagePath); // Usuń plik tymczasowy
-
-      try {
-        const painting = await Painting.create({
-          firstName,
-          lastName,
-          title,
-          age,
-          city,
-          country,
-          school,
-          technique,
-          contest,
-          year,
-          award,
-          image: path.basename(webpPath),
-          filters,
-        });
-
-        res.status(201).json(painting);
-      } catch (err) {
-        res.status(500).json({ message: err.message });
-      }
-    })
-    .on("error", (err) => {
-      res.status(500).json({ message: "Conversion error: " + err.message });
-    })
-    .run();
 };
 
-// GET ALL PAINTINGS METHOD
+// Konfiguracja multer do przechowywania w pamięci (bez zapisu na dysku)
+// const storage = multer.memoryStorage();
+// const upload = multer({ storage });
+// Globalny obiekt do przechowywania fragmentów plików (w produkcji zaleca się użycie Redis lub bazy danych)
+// const fileChunks = {};
+
+// const createPainting = async (req, res) => {
+//   try {
+//     // Wyciągnięcie danych z `req.body`
+//     const {
+//       firstName,
+//       lastName,
+//       title,
+//       age,
+//       city,
+//       country,
+//       school,
+//       technique,
+//       contest,
+//       year,
+//       award,
+//       filters,
+//       chunkNumber,
+//       totalChunks,
+//       originalName,
+//     } = req.body;
+
+//     // Przechowywanie fragmentu obrazu z multer
+//     const fileChunk = req.file.buffer;
+
+//     // Inicjalizacja tablicy do przechowywania fragmentów, jeśli jeszcze nie istnieje dla danego obrazu
+//     if (!fileChunks[originalName]) {
+//       fileChunks[originalName] = [];
+//     }
+
+//     // Dodanie fragmentu do tablicy
+//     fileChunks[originalName][chunkNumber] = fileChunk;
+
+//     // Sprawdzenie, czy wszystkie fragmenty zostały odebrane
+//     if (parseInt(chunkNumber) === totalChunks - 1) {
+//       // Złożenie pełnego obrazu z fragmentów
+//       const fullImageBuffer = Buffer.concat(fileChunks[originalName]);
+
+//       // Konwersja obrazu na Base64
+//       const base64Image = fullImageBuffer.toString("base64");
+
+//       // Usunięcie danych fragmentów po złożeniu pełnego obrazu
+//       delete fileChunks[originalName];
+
+//       // Tworzenie nowego dokumentu obrazu
+//       const painting = new Painting({
+//         firstName,
+//         lastName,
+//         title,
+//         age,
+//         city,
+//         country,
+//         school,
+//         technique,
+//         contest,
+//         year,
+//         award,
+//         image: originalName,
+//         filters: JSON.parse(filters),
+//       });
+
+//       // Zapis dokumentu w bazie danych
+//       await painting.save();
+
+//       res
+//         .status(201)
+//         .json({ message: "Painting created successfully", painting });
+//     } else {
+//       // Odpowiedź o poprawnym przesłaniu fragmentu
+//       res.status(200).json({
+//         message: `Chunk ${parseInt(chunkNumber) + 1}/${totalChunks} received`,
+//       });
+//     }
+//   } catch (error) {
+//     console.error(error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to create painting", error: error.message });
+//   }
+// };
+
+// // GET ALL PAINTINGS METHOD
 const getAllPaintings = async (req, res) => {
   const paintings = await Painting.find();
   if (!paintings) {
@@ -148,7 +263,6 @@ const deletePainting = async (req, res) => {
   }
 };
 
-// GET FILTERED PAINTINGS
 const getFilteredPainting = async (req, res) => {
   const {
     fullName,
@@ -206,27 +320,5 @@ module.exports = {
   updatePainting,
   deletePainting,
   getFilteredPainting,
+  upload,
 };
-
-// {
-//   "filters": {
-//       "technique": "grafika komputerowa",
-//       "contest": "Ogólnopolski Konkurs Grafiki",
-//       "award": true,
-//       "country": "Polska"
-//   },
-//   "_id": "6728ce92e018bd639c3db10f",
-//   "firstName": "Michał",
-//   "lastName": "Nowak",
-//   "title": "Młody Grafik",
-//   "age": 12,
-//   "city": "Kraków",
-//   "country": "Polska",
-//   "school": "Szkoła Podstawowa nr 20",
-//   "technique": "grafika komputerowa",
-//   "contest": "Ogólnopolski Konkurs Grafiki",
-//   "year": 2022,
-//   "award": "Pierwsze miejsce",
-//   "image": "1730727569847.webp",
-//   "__v": 0
-// },
