@@ -4,8 +4,9 @@ const multer = require("multer");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs");
+const { imageToWebp } = require("image-to-webp");
 
-// CREATE PAINTING z konwersją na WebM
+// CREATE PAINTING z konwersją na WebP
 
 const { Buffer } = require("buffer");
 
@@ -61,6 +62,17 @@ const createPainting = async (req, res) => {
 
       // Zapis scalonego pliku na dysk
       fs.writeFileSync(filePath, fullImageBuffer);
+
+      // console.log("fullImageBuffer: ", filePath);
+
+      // const readFile = fs.readFileSync(`./public/uploads/${originalName}`);
+
+      // const imgToWebP = fullImageBuffer;
+      // const outputFilePath = await imageToWebp(fullImageBuffer, 90);
+      // fs.copyFileSync(
+      //   webpImage,
+      //   `${__dirname}/./../public/uplaods/${originalName.slice(0, -4)}.webp`
+      // );
 
       // Usunięcie danych fragmentów po złożeniu pełnego obrazu
       delete fileChunks[originalName];
