@@ -195,8 +195,7 @@ const deletePainting = async (req, res) => {
 
 const getFilteredPainting = async (req, res) => {
   const {
-    firstName,
-    lastName,
+    fullName,
     title,
     minAge,
     maxAge,
@@ -209,6 +208,11 @@ const getFilteredPainting = async (req, res) => {
     award,
     country,
   } = req.body;
+
+  console.log(fullName);
+
+  const [firstName, ...lastNameParts] = fullName.trim().split(" ");
+  const lastName = lastNameParts.join(" ");
 
   const filter = {
     ...(firstName && { firstName }),
