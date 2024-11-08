@@ -4,7 +4,9 @@ const multer = require("multer");
 const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs");
-const { imageToWebp } = require("image-to-webp");
+const sharp = require("sharp");
+
+const imageProcessing = sharp();
 
 // CREATE PAINTING z konwersją na WebP
 
@@ -40,7 +42,6 @@ const createPainting = async (req, res) => {
     // Przechowywanie fragmentu obrazu z multer
     const fileChunk = req.file.buffer;
 
-    // Inicjalizacja tablicy do przechowywania fragmentów, jeśli jeszcze nie istnieje dla danego obrazu
     if (!fileChunks[originalName]) {
       fileChunks[originalName] = [];
     }
@@ -56,25 +57,40 @@ const createPainting = async (req, res) => {
       // Ścieżka do zapisu scalonego pliku
       const filePath = path.join(
         __dirname,
-        "./../public/uploads",
+        "./../public/original",
         originalName
       );
 
       // Zapis scalonego pliku na dysk
       fs.writeFileSync(filePath, fullImageBuffer);
 
-      // console.log("fullImageBuffer: ", filePath);
+      const toPathFilePath = path.join(
+        __dirname,
+        "./../public/uploads",
+        originalName
+      );
+      const fromFilePath = path.join(
+        __dirname,
+        "./../public/original",
+        originalName
+      );
 
-      // const readFile = fs.readFileSync(`./public/uploads/${originalName}`);
+      fs.mkdirSync(path.dirname(toPathFilePath), { recursive: true });
 
-      // const imgToWebP = fullImageBuffer;
-      // const outputFilePath = await imageToWebp(fullImageBuffer, 90);
-      // fs.copyFileSync(
-      //   webpImage,
-      //   `${__dirname}/./../public/uplaods/${originalName.slice(0, -4)}.webp`
-      // );
+      const toPath = fs.createWriteStream(fromFilePath);
 
-      // Usunięcie danych fragmentów po złożeniu pełnego obrazu
+      const readFile = fs.readFileSync(fromFilePath);
+
+      sharp(readFile)
+        .webp()
+        .toFile(`${toPathFilePath.slice(0, -4)}.webp`, (err, info) => {
+          if (err) {
+            console.error("Sharp processing error:", err);
+          } else {
+            console.log("Image successfully converted to WebP:", info);
+          }
+        });
+
       delete fileChunks[originalName];
 
       // Tworzenie nowego dokumentu obrazu z nazwą pliku zamiast jego zawartości
@@ -90,7 +106,7 @@ const createPainting = async (req, res) => {
         contest,
         year,
         award,
-        image: originalName, // zapisujemy tylko nazwę pliku
+        image: `${originalName.slice(0, -4)}.webp`,
         filters: JSON.parse(filters),
       });
 
@@ -113,92 +129,6 @@ const createPainting = async (req, res) => {
       .json({ message: "Failed to create painting", error: error.message });
   }
 };
-
-// Konfiguracja multer do przechowywania w pamięci (bez zapisu na dysku)
-// const storage = multer.memoryStorage();
-// const upload = multer({ storage });
-// Globalny obiekt do przechowywania fragmentów plików (w produkcji zaleca się użycie Redis lub bazy danych)
-// const fileChunks = {};
-
-// const createPainting = async (req, res) => {
-//   try {
-//     // Wyciągnięcie danych z `req.body`
-//     const {
-//       firstName,
-//       lastName,
-//       title,
-//       age,
-//       city,
-//       country,
-//       school,
-//       technique,
-//       contest,
-//       year,
-//       award,
-//       filters,
-//       chunkNumber,
-//       totalChunks,
-//       originalName,
-//     } = req.body;
-
-//     // Przechowywanie fragmentu obrazu z multer
-//     const fileChunk = req.file.buffer;
-
-//     // Inicjalizacja tablicy do przechowywania fragmentów, jeśli jeszcze nie istnieje dla danego obrazu
-//     if (!fileChunks[originalName]) {
-//       fileChunks[originalName] = [];
-//     }
-
-//     // Dodanie fragmentu do tablicy
-//     fileChunks[originalName][chunkNumber] = fileChunk;
-
-//     // Sprawdzenie, czy wszystkie fragmenty zostały odebrane
-//     if (parseInt(chunkNumber) === totalChunks - 1) {
-//       // Złożenie pełnego obrazu z fragmentów
-//       const fullImageBuffer = Buffer.concat(fileChunks[originalName]);
-
-//       // Konwersja obrazu na Base64
-//       const base64Image = fullImageBuffer.toString("base64");
-
-//       // Usunięcie danych fragmentów po złożeniu pełnego obrazu
-//       delete fileChunks[originalName];
-
-//       // Tworzenie nowego dokumentu obrazu
-//       const painting = new Painting({
-//         firstName,
-//         lastName,
-//         title,
-//         age,
-//         city,
-//         country,
-//         school,
-//         technique,
-//         contest,
-//         year,
-//         award,
-//         image: originalName,
-//         filters: JSON.parse(filters),
-//       });
-
-//       // Zapis dokumentu w bazie danych
-//       await painting.save();
-
-//       res
-//         .status(201)
-//         .json({ message: "Painting created successfully", painting });
-//     } else {
-//       // Odpowiedź o poprawnym przesłaniu fragmentu
-//       res.status(200).json({
-//         message: `Chunk ${parseInt(chunkNumber) + 1}/${totalChunks} received`,
-//       });
-//     }
-//   } catch (error) {
-//     console.error(error);
-//     res
-//       .status(500)
-//       .json({ message: "Failed to create painting", error: error.message });
-//   }
-// };
 
 // // GET ALL PAINTINGS METHOD
 const getAllPaintings = async (req, res) => {
