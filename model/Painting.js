@@ -6,6 +6,7 @@ const paintingSchema = new mongoose.Schema({
   title: { type: String, required: true },
   age: { type: Number, required: true },
   city: { type: String, required: true },
+  pid: { type: String, required: true },
   country: { type: String, required: true },
   school: { type: String, required: true },
   technique: { type: String, required: true },

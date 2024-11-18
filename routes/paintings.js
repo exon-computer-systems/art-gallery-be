@@ -13,8 +13,9 @@ const {
 // Route to create a new painting
 router.post("/", upload.single("image"), createPainting);
 router.get("/", getAllPaintings);
-router.get("/:pid", getPainting);
-router.put("/:pid", updatePainting);
+router.get("/:id", getPainting);
+router.put("/:id", upload.single("image"), updatePainting);
+
 router.delete("/:pid", deletePainting);
 
 router.route("/filter").post(getFilteredPainting);

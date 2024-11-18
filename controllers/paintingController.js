@@ -24,6 +24,7 @@ const createPainting = async (req, res) => {
     const {
       firstName,
       lastName,
+      pid,
       title,
       age,
       city,
@@ -101,6 +102,7 @@ const createPainting = async (req, res) => {
         age,
         city,
         country,
+        pid,
         school,
         technique,
         contest,
@@ -141,15 +143,15 @@ const getAllPaintings = async (req, res) => {
 
 // GET ONE PAINTING METHOD
 const getPainting = async (req, res) => {
-  if (!req.params?.pid) {
+  if (!req.params?.id) {
     return res.status(400).json({ message: "Painting ID required" });
   }
   try {
-    const painting = await Painting.findOne({ pid: req.params.pid });
+    const painting = await Painting.findOne({ _id: req.params.id });
     if (!painting) {
       return res
         .status(404)
-        .json({ message: `Painting ID ${req.params.pid} not found` });
+        .json({ message: `Painting ID ${req.params.id} not found` });
     }
     res.json(painting);
   } catch (err) {
@@ -159,26 +161,136 @@ const getPainting = async (req, res) => {
 
 // UPDATE PAINTINGS METHOD
 const updatePainting = async (req, res) => {
-  if (!req?.params.pid) {
+  if (!req?.params.id) {
     return res.status(400).json({ message: "Painting ID required" });
   }
+
   try {
+    const {
+      firstName,
+      lastName,
+      title,
+      age,
+      city,
+      country,
+      pid,
+      school,
+      technique,
+      contest,
+      year,
+      award,
+      filters,
+      chunkNumber,
+      totalChunks,
+      originalName,
+    } = req.body;
+
+    const fileChunk = req.file?.buffer; // Obsługa opcjonalnego pliku
+    let updatedImageName;
+
+    if (fileChunk) {
+      if (!fileChunks[originalName]) {
+        fileChunks[originalName] = [];
+      }
+
+      // Dodanie fragmentu do tablicy
+      fileChunks[originalName][chunkNumber] = fileChunk;
+
+      // Sprawdzenie, czy wszystkie fragmenty zostały odebrane
+      if (parseInt(chunkNumber) === totalChunks - 1) {
+        const fullImageBuffer = Buffer.concat(fileChunks[originalName]);
+
+        const filePath = path.join(
+          __dirname,
+          "./../public/original",
+          originalName
+        );
+
+        fs.writeFileSync(filePath, fullImageBuffer);
+
+        const toPathFilePath = path.join(
+          __dirname,
+          "./../public/uploads",
+          originalName
+        );
+        const fromFilePath = path.join(
+          __dirname,
+          "./../public/original",
+          originalName
+        );
+
+        fs.mkdirSync(path.dirname(toPathFilePath), { recursive: true });
+
+        const readFile = fs.readFileSync(fromFilePath);
+
+        const webpFileName = `${originalName.slice(0, -4)}.webp`;
+        updatedImageName = webpFileName;
+
+        await sharp(readFile)
+          .webp()
+          .toFile(toPathFilePath.replace(/\.[^.]+$/, ".webp"));
+
+        delete fileChunks[originalName];
+      } else {
+        return res.status(200).json({
+          message: `Chunk ${parseInt(chunkNumber) + 1}/${totalChunks} received`,
+        });
+      }
+    }
+
+    const updatedData = {
+      ...(firstName && { firstName }),
+      ...(lastName && { lastName }),
+      ...(title && { title }),
+      ...(age && { age }),
+      ...(city && { city }),
+      ...(country && { country }),
+      ...(pid && { pid }),
+      ...(school && { school }),
+      ...(technique && { technique }),
+      ...(contest && { contest }),
+      ...(year && { year }),
+      ...(award && { award }),
+      ...(filters && { filters: JSON.parse(filters) }),
+      ...(updatedImageName && { image: updatedImageName }),
+    };
+
     const updatedPainting = await Painting.findOneAndUpdate(
-      { pid: req.params.pid },
-      req.body,
+      { _id: req.params.id },
+      updatedData,
       { new: true }
     );
+
     if (!updatedPainting) {
       return res.status(404).json({ message: "Painting not found" });
     }
+
     res.status(200).json(updatedPainting);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
 
 // DELTETE PAINTINGS METHOD
 const deletePainting = async (req, res) => {
+  const getFileName = req.body.image;
+
+  if (!getFileName) {
+    console.error("getFileName is undefined or missing");
+  } else {
+    fs.unlinkSync(path.join(__dirname, `./../public/uploads/${getFileName}`));
+    fs.unlinkSync(
+      path.join(
+        __dirname,
+        `./../public/original/${getFileName.slice(0, -5)}.jpg`
+      )
+    );
+    console.log(
+      `Deleted: ${path.join(__dirname, `./../public/uploads/${getFileName}`)}`
+    );
+  }
+
   if (!req.params?.pid) {
     return res.status(400).json({ message: "Painting ID required" });
   }
